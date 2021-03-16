@@ -14,25 +14,19 @@ const auctionSocket = (io) => {
     console.log("client connected");
     socket.on("startAuction", async ({ roomId, userId }) => {
       const roomObj = await Room.findById(roomId);
-
-      const playerId =
-        roomObj.Auction.playerRemainings[roomObj.Auction.currentRound];
-
       await client.set(
         roomId,
         JSON.stringify({
-          currentRound: { currentBidder: null, playerId: playerId },
+          currentRound: { currentBidder: null, playerId: roomObj.Auction.playerRemainings[roomObj.Auction.currentRound] },
           highestBid: 0,
         })
       );
 
-     var interval = setInterval(async () => {
+      var interval = setInterval(async () => {
         const currentRound = JSON.parse(await client.get(roomId)).currentRound;
-        // console.log(await client.get(roomId));
-        //params roomid playerId bidderId, and bid amt
-        // setTimeout(()=> {
-
-        if(roomObj.Auction.currentRound > roomObj.Auction.playerRemainings.length){
+        if (
+          roomObj.Auction.currentRound > roomObj.Auction.playerRemainings.length
+        ) {
           clearInterval(interval);
           socket.emit("auction ended");
         }
@@ -44,14 +38,7 @@ const auctionSocket = (io) => {
           currentRound.currentBidder,
           currentRound.highestBid
         );
-        // }, 15000)
 
-        //start next round by cleaning prev. data
-        // const roomObj2 = await Room.findOneAndUpdate(roomId, {
-        //   $set: {
-        //     [Auction.currentRound]: roomObj.Auction.currentRound + 1,
-        //   },
-        // });
 
         roomObj.Auction.currentRound += 1;
         roomObj.save();
@@ -67,13 +54,13 @@ const auctionSocket = (io) => {
 
         await client.set(roomId, JSON.stringify(_roomObj));
 
-        var playerObj2 = await helpers.fetchPlayerDetails(playerId);
+        var playerObj2 = await helpers.fetchPlayerDetails(roomObj.Auction.playerRemainings[roomObj.Auction.currentRound].pid);
 
-        socket.broadcast.to(roomId).emit("new player", playerObj2);
+        socket.to(roomId).emit("new player", playerObj2);
       }, 2000);
 
       socket.join(roomId);
-      const playerObj = await helpers.fetchPlayerDetails(playerId);
+      const playerObj = await helpers.fetchPlayerDetails(roomObj.Auction.playerRemainings[roomObj.Auction.currentRound].pid);
 
       socket.broadcast.to(roomId).emit("auction start", playerObj);
     });
@@ -87,19 +74,26 @@ const auctionSocket = (io) => {
     });
 
     socket.on("placebid", async ({ roomId, bidderId, bidAmt, playerId }) => {
+      console.log(
+        "log12: " + JSON.stringify({ roomId, bidderId, bidAmt, playerId })
+      );
+
+      // socket.broadcast.to(roomId).emit("bidPlaced", {
+      //   // bidderInfo: await helpers.bidderInfo(bidderId),
+      //   bidAmt: bidAmt,
+      // });
+
       const highestBid = JSON.parse(await client.get(roomId)).highestBid;
 
       if (bidAmt <= highestBid) {
         return;
       } else {
-        await client.set(
-          roomId,
-          JSON.stringify(
-            (JSON.parse(await client.get(roomId)).highestBid = bidAmt)
-          )
-        );
+        const _roomBid = JSON.parse(await client.get(roomId));
+        _roomBid.highestBid = bidAmt;
+ 
+        await client.set(roomId, JSON.stringify(_roomBid));
 
-        socket.broadcast.to(roomId).emit("bidPlaced", {
+        socket.to(roomId).emit("bidPlaced", {
           bidderInfo: await helpers.bidderInfo(bidderId),
           bidAmt: bidAmt,
         });

@@ -33,15 +33,15 @@ const buyPlayer = async (roomId, playerId, bidderId, amount) => {
   console.log("PLAYER NOT SOLD");
 };
 const fetchPlayerDetails = async (pid) => {
+  console.log("pid "+pid)
   var player = {};
-  axios
+  var res = await axios
     .post("https://cricapi.com/api/playerStats", {
       apikey: "lTnE4tXFYcQdK1eADdrmAaNi82A3",
       pid,
-    })
-    .then((res) => {
-      player = res.data;
     });
+
+    player = res.data;
   return player;
 };
 
